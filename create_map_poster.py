@@ -1031,6 +1031,10 @@ Examples:
             sys.exit(1)
         themes_to_generate = [args.theme]
 
+    overpass_mirrors = (
+        [args.overpass_url] + OVERPASS_MIRRORS if args.overpass_url else OVERPASS_MIRRORS
+    )
+
     print("=" * 50)
     print("City Map Poster Generator")
     print("=" * 50)
@@ -1068,6 +1072,7 @@ Examples:
                 display_city=args.display_city,
                 display_country=args.display_country,
                 fonts=custom_fonts,
+                overpass_mirrors=overpass_mirrors,
             )
 
         print("\n" + "=" * 50)
