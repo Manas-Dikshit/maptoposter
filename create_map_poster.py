@@ -568,6 +568,17 @@ def create_poster(
 
     print(f"\nGenerating map for {city}, {country}...")
 
+    # Pick one live Overpass mirror up front so a dead server never hangs the run
+    overpass_mirrors = overpass_mirrors or OVERPASS_MIRRORS
+    live_mirror = pick_overpass_mirror(overpass_mirrors)
+    if live_mirror is None:
+        raise RuntimeError(
+            "No Overpass API mirror is reachable right now. The servers are "
+            "often overloaded; retry in a minute or provide --overpass-url."
+        )
+    print(f"✓ Using Overpass mirror: {live_mirror}")
+    overpass_mirrors = [live_mirror]
+
     # Progress bar for data fetching
     with tqdm(
         total=3,
