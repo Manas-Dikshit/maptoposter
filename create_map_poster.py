@@ -32,6 +32,13 @@ from tqdm import tqdm
 
 from font_management import load_fonts
 
+# Console output may be cp1252 on Windows; never crash printing unicode like ✓/✗
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except AttributeError:
+    pass
+
 
 class CacheError(Exception):
     """Raised when a cache operation fails."""
