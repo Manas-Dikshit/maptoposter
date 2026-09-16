@@ -568,9 +568,16 @@ def create_poster(
 
     print(f"\nGenerating map for {city}, {country}...")
 
-    # Pick one live Overpass mirror up front so a dead server never hangs the run
+    # Pick one live Overpass mirror up front so a dead server never hangs the run.
+    # Mirrors flap between healthy/overloaded within seconds, so retry the (fast) probe.
     overpass_mirrors = overpass_mirrors or OVERPASS_MIRRORS
-    live_mirror = pick_overpass_mirror(overpass_mirrors)
+    live_mirror = None
+    for attempt in range(5):
+        live_mirror = pick_overpass_mirror(overpass_mirrors)
+        if live_mirror is not None:
+            break
+        print(f"   ↳ No mirror responding, retrying ({attempt + 1}/5)...")
+        time.sleep(5)
     if live_mirror is None:
         raise RuntimeError(
             "No Overpass API mirror is reachable right now. The servers are "
