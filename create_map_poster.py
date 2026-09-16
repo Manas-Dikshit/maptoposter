@@ -406,19 +406,29 @@ def get_crop_limits(g_proj, center_lat_lon, fig, dist):
     )
 
 
-def fetch_graph(point, dist) -> MultiDiGraph | None:
+OVERPASS_MIRRORS = [
+    "https://overpass-api.de/api",
+    "https://overpass.kumi.systems/api",
+    "https://overpass.private.coffee/api",
+    "https://overpass.nchc.org.tw/api",
+]
+
+
+def fetch_graph(point, dist, mirrors=None) -> MultiDiGraph | None:
     """
     Fetch street network graph from OpenStreetMap.
 
     Uses caching to avoid redundant downloads. Fetches all network types
-    within the specified distance from the center point.
+    within the specified distance from the center point. Tries each
+    Overpass mirror in order until one succeeds.
 
     Args:
         point: (latitude, longitude) tuple for center point
         dist: Distance in meters from center point
+        mirrors: Overpass API base URLs to try (default: OVERPASS_MIRRORS)
 
     Returns:
-        MultiDiGraph of street network, or None if fetch fails
+        MultiDiGraph of street network, or None if all mirrors fail
     """
     lat, lon = point
     graph = f"graph_{lat}_{lon}_{dist}"
@@ -427,35 +437,42 @@ def fetch_graph(point, dist) -> MultiDiGraph | None:
         print("✓ Using cached street network")
         return cast(MultiDiGraph, cached)
 
-    try:
-        g = ox.graph_from_point(point, dist=dist, dist_type='bbox', network_type='all', truncate_by_edge=True)
-        # Rate limit between requests
-        time.sleep(0.5)
+    mirrors = mirrors or OVERPASS_MIRRORS
+    ox.settings.requests_timeout = 30  # fail fast; servers often hang when overloaded
+    for url in mirrors:
+        ox.settings.overpass_url = url
         try:
-            cache_set(graph, g)
-        except CacheError as e:
-            print(e)
-        return g
-    except Exception as e:
-        print(f"OSMnx error while fetching graph: {e}")
-        return None
+            g = ox.graph_from_point(point, dist=dist, dist_type='bbox', network_type='all', truncate_by_edge=True)
+            # Rate limit between requests
+            time.sleep(0.5)
+            try:
+                cache_set(graph, g)
+            except CacheError as e:
+                print(e)
+            return g
+        except Exception as e:
+            print(f"   ↳ Overpass mirror {url} failed: {e}")
+    print("OSMnx error while fetching graph: all Overpass mirrors failed")
+    return None
 
 
-def fetch_features(point, dist, tags, name) -> GeoDataFrame | None:
+def fetch_features(point, dist, tags, name, mirrors=None) -> GeoDataFrame | None:
     """
     Fetch geographic features (water, parks, etc.) from OpenStreetMap.
 
     Uses caching to avoid redundant downloads. Fetches features matching
-    the specified OSM tags within distance from center point.
+    the specified OSM tags within distance from center point. Tries each
+    Overpass mirror in order until one succeeds.
 
     Args:
         point: (latitude, longitude) tuple for center point
         dist: Distance in meters from center point
         tags: Dictionary of OSM tags to filter features
         name: Name for this feature type (for caching and logging)
+        mirrors: Overpass API base URLs to try (default: OVERPASS_MIRRORS)
 
     Returns:
-        GeoDataFrame of features, or None if fetch fails
+        GeoDataFrame of features, or None if all mirrors fail
     """
     lat, lon = point
     tag_str = "_".join(tags.keys())
@@ -465,18 +482,23 @@ def fetch_features(point, dist, tags, name) -> GeoDataFrame | None:
         print(f"✓ Using cached {name}")
         return cast(GeoDataFrame, cached)
 
-    try:
-        data = ox.features_from_point(point, tags=tags, dist=dist)
-        # Rate limit between requests
-        time.sleep(0.3)
+    mirrors = mirrors or OVERPASS_MIRRORS
+    ox.settings.requests_timeout = 30  # fail fast; servers often hang when overloaded
+    for url in mirrors:
+        ox.settings.overpass_url = url
         try:
-            cache_set(features, data)
-        except CacheError as e:
-            print(e)
-        return data
-    except Exception as e:
-        print(f"OSMnx error while fetching features: {e}")
-        return None
+            data = ox.features_from_point(point, tags=tags, dist=dist)
+            # Rate limit between requests
+            time.sleep(0.3)
+            try:
+                cache_set(features, data)
+            except CacheError as e:
+                print(e)
+            return data
+        except Exception as e:
+            print(f"   ↳ Overpass mirror {url} failed: {e}")
+    print(f"OSMnx error while fetching {name}: all Overpass mirrors failed")
+    return None
 
 
 def create_poster(
@@ -493,6 +515,7 @@ def create_poster(
     display_city=None,
     display_country=None,
     fonts=None,
+    overpass_mirrors=None,
 ):
     """
     Generate a complete map poster with roads, water, parks, and typography.
@@ -532,7 +555,7 @@ def create_poster(
         # 1. Fetch Street Network
         pbar.set_description("Downloading street network")
         compensated_dist = dist * (max(height, width) / min(height, width)) / 4  # To compensate for viewport crop
-        g = fetch_graph(point, compensated_dist)
+        g = fetch_graph(point, compensated_dist, mirrors=overpass_mirrors)
         if g is None:
             raise RuntimeError("Failed to retrieve street network data.")
         pbar.update(1)
@@ -544,6 +567,7 @@ def create_poster(
             compensated_dist,
             tags={"natural": ["water", "bay", "strait"], "waterway": "riverbank"},
             name="water",
+            mirrors=overpass_mirrors,
         )
         pbar.update(1)
 
@@ -554,6 +578,7 @@ def create_poster(
             compensated_dist,
             tags={"leisure": "park", "landuse": "grass"},
             name="parks",
+            mirrors=overpass_mirrors,
         )
         pbar.update(1)
 
@@ -954,6 +979,12 @@ Examples:
         default="png",
         choices=["png", "svg", "pdf"],
         help="Output format for the poster (default: png)",
+    )
+    parser.add_argument(
+        "--overpass-url",
+        dest="overpass_url",
+        default=None,
+        help="Override the Overpass API endpoint base URL (e.g. https://overpass.kumi.systems/api). Mirrors are tried in order on failure.",
     )
 
     args = parser.parse_args()
