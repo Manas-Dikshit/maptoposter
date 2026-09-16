@@ -2,7 +2,7 @@
 
 Generate beautiful, minimalist map posters for any city in the world.
 
-<img src="posters/bhubaneswar_midnight_blue_20260917_010723.png" width="250"> <img src="posters/kolkata_contrast_zones_20260917_010310.png" width="250"> <img src="posters/mumbai_contrast_zones_20260118_145843.png" width="250"> <img src="posters/singapore_neon_cyberpunk_20260118_153328.png" width="250"> <img src="posters/dubai_midnight_blue_20260118_140807.png" width="250">
+<img src="posters\bhubaneswar_neon_cyberpunk_20260917_011735.png" width="250"> <img src="posters/kolkata_contrast_zones_20260917_010310.png" width="250"> <img src="posters/mumbai_contrast_zones_20260118_145843.png" width="250"> <img src="posters/singapore_neon_cyberpunk_20260118_153328.png" width="250"> <img src="posters/dubai_midnight_blue_20260118_140807.png" width="250">
 
 ## Installation
 
