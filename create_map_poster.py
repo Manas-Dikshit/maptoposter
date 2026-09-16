@@ -22,6 +22,7 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import osmnx as ox
+import requests
 from geopandas import GeoDataFrame
 from geopy.geocoders import Nominatim
 from lat_lon_parser import parse
@@ -419,6 +420,21 @@ OVERPASS_MIRRORS = [
     "https://overpass.private.coffee/api",
     "https://overpass.nchc.org.tw/api",
 ]
+
+
+def pick_overpass_mirror(mirrors):
+    """Probe each mirror with a tiny query and return the first that answers. None if all dead."""
+    tiny = '[out:json][timeout:10];way(id:1);out;'
+    headers = {"user-agent": ox.settings.http_user_agent}
+    for url in mirrors:
+        try:
+            r = requests.post(url + "/interpreter", data={"data": tiny}, headers=headers, timeout=8)
+            if r.headers.get("Content-Type", "").startswith("application/json"):
+                return url
+            print(f"   ↳ Overpass mirror {url} unhealthy (HTTP {r.status_code})")
+        except Exception as e:
+            print(f"   ↳ Overpass mirror {url} unreachable: {str(e)[:60]}")
+    return None
 
 
 def fetch_graph(point, dist, mirrors=None) -> MultiDiGraph | None:
