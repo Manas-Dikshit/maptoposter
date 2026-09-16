@@ -984,7 +984,8 @@ Examples:
         "--overpass-url",
         dest="overpass_url",
         default=None,
-        help="Override the Overpass API endpoint base URL (e.g. https://overpass.kumi.systems/api). Mirrors are tried in order on failure.",
+        help="Override the Overpass API endpoint base URL (e.g. "
+             "https://overpass.kumi.systems/api). Mirrors are tried in order on failure.",
     )
 
     args = parser.parse_args()
