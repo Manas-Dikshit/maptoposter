@@ -461,7 +461,7 @@ def fetch_graph(point, dist, mirrors=None) -> MultiDiGraph | None:
         return cast(MultiDiGraph, cached)
 
     mirrors = mirrors or OVERPASS_MIRRORS
-    ox.settings.requests_timeout = 30  # fail fast; servers often hang when overloaded
+    ox.settings.requests_timeout = 20  # fail fast; servers often hang when overloaded
     for url in mirrors:
         ox.settings.overpass_url = url
         try:
@@ -506,7 +506,7 @@ def fetch_features(point, dist, tags, name, mirrors=None) -> GeoDataFrame | None
         return cast(GeoDataFrame, cached)
 
     mirrors = mirrors or OVERPASS_MIRRORS
-    ox.settings.requests_timeout = 30  # fail fast; servers often hang when overloaded
+    ox.settings.requests_timeout = 20  # fail fast; servers often hang when overloaded
     for url in mirrors:
         ox.settings.overpass_url = url
         try:
@@ -593,10 +593,17 @@ def create_poster(
         unit="step",
         bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt}",
     ) as pbar:
-        # 1. Fetch Street Network
+        # 1. Fetch Street Network (retry with fresh probe; mirrors flap within seconds)
         pbar.set_description("Downloading street network")
         compensated_dist = dist * (max(height, width) / min(height, width)) / 4  # To compensate for viewport crop
-        g = fetch_graph(point, compensated_dist, mirrors=overpass_mirrors)
+        g = None
+        for attempt in range(3):
+            if attempt:
+                print(f"   ↳ Street network download failed, re-probing mirrors ({attempt + 1}/3)...")
+                overpass_mirrors = [n] if (n := pick_overpass_mirror(OVERPASS_MIRRORS)) else OVERPASS_MIRRORS
+            g = fetch_graph(point, compensated_dist, mirrors=overpass_mirrors)
+            if g is not None:
+                break
         if g is None:
             raise RuntimeError("Failed to retrieve street network data.")
         pbar.update(1)
